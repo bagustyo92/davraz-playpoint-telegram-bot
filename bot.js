@@ -8,6 +8,60 @@ var ssId = "{google_app_script_id}"; // Ini adalah ID dari google Sheet
 var spreadsheetLink = "{google_spreedsheet_url}";
 var botUserName = "{bot_username}";
 
+function sendReportTelegramReminderToCreateReport() {
+  const store = PropertiesService.getScriptProperties();
+  const chatId = store.getProperty("TELEGRAM_CHAT_ID");
+
+  Logger.log("Stored chat ID: " + chatId);
+  if (chatId == null) {
+    Logger.log("Chat ID is null");
+    return;
+  }
+
+  const reminderMessage =
+    "Hi @nabitaayu ini pengingat untuk menghitung total pendapatan hari ini. Berapa pemasukan hari ini? ";
+
+  sendText(chatId, reminderMessage);
+}
+
+function sendReportTelegramReminderToInput() {
+  const store = PropertiesService.getScriptProperties();
+  const chatId = store.getProperty("TELEGRAM_CHAT_ID");
+
+  Logger.log("Stored chat ID: " + chatId);
+  if (chatId == null) {
+    Logger.log("Chat ID is null");
+    return;
+  }
+
+  const reminderMessage =
+    "Hi pagi @nabitaayu ini pengingat untuk input orang yang main hari ini ya";
+
+  sendText(chatId, reminderMessage);
+}
+
+function createTriggerForReminder() {
+  const date = new Date();
+  date.setHours(20);
+  date.setMinutes(0);
+  date.setSeconds(0);
+  
+  const store = PropertiesService.getScriptProperties();
+  const chatId = store.getProperty("TELEGRAM_CHAT_ID");
+  Logger.log("Stored chat ID: " + chatId); 
+
+  ScriptApp.newTrigger("sendReportTelegramReminderToCreateReport")
+           .timeBased()
+           .at(date)
+           .create();
+
+  date.setHours(8);
+  ScriptApp.newTrigger("sendReportTelegramReminderToInput")
+           .timeBased()
+           .at(date)
+           .create();
+}
+
 function getMe() {
   var url = telegramUrl + "/getMe";
   var response = UrlFetchApp.fetch(url);
@@ -37,6 +91,10 @@ function doPost(e) {
     const text = message.text;
     const chatId = message.chat.id;
     const senderName = message.from.first_name || "User";
+
+    // Store to PropertiesService
+    const store = PropertiesService.getScriptProperties();
+    store.setProperty("TELEGRAM_CHAT_ID", chatId.toString());
 
     // Function to check if the bot is mentioned in a group
     const isGroupChat = chatId < 0; // Telegram group chats have negative chat IDs
@@ -125,9 +183,18 @@ function handleMainCommand(chatId, senderName, datas) {
     return;
   }
 
-  if (isNaN(duration) || duration < 1 || duration > 4) {
+  const pricePerHour = 6000;
+  var totalPrice = 0;
+
+  if (duration == 30) {
+    totalPrice = 3000;
+  } else if (isNaN(duration) || duration < 1 || duration > 4) {
     sendText(chatId, "Durasi bermain harus antara 1 hingga 4 jam.");
     return;
+  }
+
+  if (totalPrice == 0) {
+    totalPrice = pricePerHour * duration
   }
 
   const now = new Date();
@@ -146,8 +213,7 @@ function handleMainCommand(chatId, senderName, datas) {
 
   const startTime = formatTime(now);
   const endTime = formatTime(new Date(now.setHours(now.getHours() + duration)));
-  const pricePerHour = now.getHours() >= 15 ? 8000 : 6000;
-  const totalPrice = pricePerHour * duration;
+  
 
   sheet.appendRow([
     psType.toUpperCase(),
